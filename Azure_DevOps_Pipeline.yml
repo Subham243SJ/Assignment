@@ -1,0 +1,62 @@
+stages:
+  - stage: Checkout
+    displayName: 'Checkout code'
+    jobs:
+      - job: Checkout
+        displayName: 'Checkout'
+        steps:
+          - checkout: self
+
+  - stage: Build
+    displayName: 'Build application'
+    jobs:
+      - job: Build
+        displayName: 'Build'
+        steps:
+          - script: |
+                npm install
+                mvn clean install        
+            displayName: 'Build application'
+
+  - stage: StaticCodeAnalysis
+    displayName: 'Static Code Analysis'
+    jobs:
+      - job: SonarQube
+        displayName: 'Run SonarQube analysis'
+        steps:
+          - script: |
+                sonar-scanner
+                mvn sonar:sonar
+                java sonarscanner begin /k:"project_key" /d:sonar.host.url="https://sonarqube.example.com" /d:sonar.login="your_token"
+            displayName: 'Run SonarQube analysis'
+
+  - stage: Test
+    displayName: 'API Testing'
+    jobs:
+      - job: Postman
+        displayName: 'Run Postman tests'
+        steps:
+          - script: |
+                newman run TestProject_API_SmokeTests.postman_collection.json -e TestProject_QA_Enviornment.postman_environment.json --env-var "url=http://api.qa.testproject.com" --reporters cli,junit --reporter-junit-export Results\\apiTestResults.xml
+            displayName: 'Run Postman tests'
+
+  - stage: Dockerize
+    displayName: 'Create Docker image'
+    jobs:
+      - job: Docker
+        displayName: 'Build and push Docker image'
+        steps:
+          - script: |
+                docker build -t spring-boot-docker .
+                docker push spring-boot-docker
+            displayName: 'Build and push Docker image'
+
+  - stage: Notification
+    displayName: 'Notify completion'
+    jobs:
+      - job: Notify
+        displayName: 'Send notification'
+        steps:
+          - script: |
+                curl -X POST -H "Content-Type: application/json" -d '{"message": "Build completed"}' <notification_url>
+            displayName: 'Send notification'
